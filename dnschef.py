@@ -45,6 +45,9 @@ import binascii
 import string
 import base64
 import time
+import urllib
+import urllib2
+import traceback
 
 # DNSHandler Mixin. The class contains generic functions to parse DNS requests and
 # calculate an appropriate response based on user parameters.
@@ -52,8 +55,8 @@ class DNSHandler():
            
     def parse(self,data):
         response = ""
-    
-        try:
+        
+	try:
             # Parse data as DNS        
             d = DNSRecord.parse(data)
 
@@ -74,7 +77,15 @@ class DNSHandler():
                 if qname[-1] == '.': qname = qname[:-1]
 
                 qtype = QTYPE[d.q.qtype]
-                
+
+                if self.server.logsvc != None:
+                    # Find subdomain. Note that only the rightmost subdomain is important for logging purposes.
+                    # Note that if subdomain length is less than a preset value in the app server, it will not be logged.
+                    labels = qname.split(".")
+                    if len(labels) > 2:
+                        topsubdomain =  labels[:-2][-1]
+                        self.server.logsvc.record_hit(topsubdomain, qtype) 
+
                 # Find all matching fake DNS records for the query name or get False
                 fake_records = dict()
 
@@ -236,6 +247,11 @@ class DNSHandler():
 
                 # Proxy the request
                 else:
+                    if self.server.noproxy == True:
+                        response = None
+                        
+                        return
+                        
                     print "[%s] %s: proxying the response of type '%s' for %s" % (time.strftime("%H:%M:%S"), self.client_address[0], qtype, qname)
                     if self.server.log: self.server.log.write( "[%s] %s: proxying the response of type '%s' for %s\n" % (time.strftime("%d/%b/%Y:%H:%M:%S %z"), self.client_address[0], qtype, qname) )
 
@@ -351,12 +367,14 @@ class TCPHandler(DNSHandler, SocketServer.BaseRequestHandler):
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
     # Override SocketServer.UDPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, log):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, log, logsvc, noproxy):
         self.nametodns  = nametodns
         self.nameservers = nameservers
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
         self.log = log
+        self.logsvc = logsvc
+        self.noproxy = noproxy;
 
         SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass) 
 
@@ -366,17 +384,46 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     allow_reuse_address = True
 
     # Override SocketServer.TCPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, log):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, log, logsvc, noproxy):
         self.nametodns   = nametodns
         self.nameservers = nameservers
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
         self.log = log
+        self.logsvc = logsvc
+        self.noproxy = noproxy;
 
         SocketServer.TCPServer.__init__(self,server_address,RequestHandlerClass) 
-        
+       
+class LogHttpService:
+    def __init__(self, endpoint) :
+	print endpoint
+	
+	if endpoint.endswith("/") :
+	    self.endpoint = endpoint
+	else :
+	    self.endpoint = endpoint + "/"
+
+	self.prefix = "http://%sd/" % self.endpoint
+
+    def record_hit(self, identity, comment=None) :
+
+	if comment == None:
+	    comment = ""
+
+	url = self.prefix + comment + "?id=" + identity 
+	print url	
+	req = urllib2.Request(url)
+	try: 
+	    response = urllib2.urlopen(req)
+	    # do not care about the response.
+	except urllib2.URLError as e:
+	    print e.reason
+	
+
+
 # Initialize and start the DNS Server        
-def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53", logfile=None):
+def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53", logfile=None, loghttp=None, noproxy=False):
     try:
 
         if logfile: 
@@ -385,11 +432,17 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
         else:
             log = None
 
+	if loghttp:
+	    logsvc = LogHttpService(loghttp)
+	    print "[*] loghttp is: " + loghttp
+	else:
+	    logsvc = None
+
         if tcp:
             print "[*] DNSChef is running in TCP mode"
-            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, nameservers, ipv6, log)
+            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, nameservers, ipv6, log, logsvc, noproxy)
         else:
-            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, nameservers, ipv6, log)
+            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, nameservers, ipv6, log, logsvc, noproxy)
 
         # Start a thread with the server -- that thread will then start
         # more threads for each request
@@ -397,6 +450,7 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
 
         # Exit the server thread when the main thread terminates
         server_thread.daemon = True
+
         server_thread.start()
         
         # Loop in the main thread
@@ -416,6 +470,7 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
         print "[!] Failed to open log file for writing."
 
     except Exception, e:
+	traceback.print_exc()
         print "[!] Failed to start the server: %s" % e
     
 if __name__ == "__main__":
@@ -445,6 +500,9 @@ if __name__ == "__main__":
     
     rungroup = OptionGroup(parser,"Optional runtime parameters.")
     rungroup.add_option("--logfile", action="store", help="Specify a log file to record all activity")
+    rungroup.add_option("--loghttp", action="store", help="*** Specify an http server for request logging.")
+    rungroup.add_option("--noproxy", action="store_true", default=False, help="*** Disable proxying unknown names.")
+
     rungroup.add_option("--nameservers", metavar="8.8.8.8#53 or 4.2.2.1#53#tcp or 2001:4860:4860::8888", default='8.8.8.8', action="store", help='A comma separated list of alternative DNS servers to use with proxied requests. Nameservers can have either IP or IP#PORT format. A randomly selected server from the list will be used for proxy requests when provided with multiple servers. By default, the tool uses Google\'s public DNS server 8.8.8.8 when running in IPv4 mode and 2001:4860:4860::8888 when running in IPv6 mode.')
     rungroup.add_option("-i","--interface", metavar="127.0.0.1 or ::1", default="127.0.0.1", action="store", help='Define an interface to use for the DNS listener. By default, the tool uses 127.0.0.1 for IPv4 mode and ::1 for IPv6 mode.')
     rungroup.add_option("-t","--tcp", action="store_true", default=False, help="Use TCP DNS proxy instead of the default UDP.")
@@ -609,4 +667,4 @@ if __name__ == "__main__":
         print "[*] No parameters were specified. Running in full proxy mode"    
 
     # Launch DNSChef
-    start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp, ipv6=options.ipv6, port=options.port, logfile=options.logfile)
+    start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp, ipv6=options.ipv6, port=options.port, logfile=options.logfile, loghttp=options.loghttp, noproxy=options.noproxy)
