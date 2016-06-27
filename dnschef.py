@@ -404,7 +404,7 @@ class LogHttpService:
 	else :
 	    self.endpoint = endpoint + "/"
 
-	self.prefix = "http://%sd/" % self.endpoint
+	self.prefix = "https://%sd/" % self.endpoint
 
     def record_hit(self, identity, comment=None) :
 
