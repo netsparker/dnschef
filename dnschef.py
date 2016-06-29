@@ -406,7 +406,12 @@ class LogHttpService:
 	else :
 	    self.endpoint = endpoint + "/"
 
-	self.prefix = "https://%sd/" % self.endpoint
+    is_http_mode = os.getenv('RESPONDER_HTTP_ONLY', "NO") == "YES"
+
+    if is_http_mode:
+    	self.prefix = "http://%sd/" % self.endpoint
+    else:
+	    self.prefix = "https://%sd/" % self.endpoint
 
     def record_hit(self, identity, comment=None) :
 
