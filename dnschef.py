@@ -399,33 +399,33 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
        
 class LogHttpService:
     def __init__(self, endpoint) :
-	print endpoint
-	
-	if endpoint.endswith("/") :
-	    self.endpoint = endpoint
-	else :
-	    self.endpoint = endpoint + "/"
+        print endpoint
+        
+        if endpoint.endswith("/") :
+            self.endpoint = endpoint
+        else :
+            self.endpoint = endpoint + "/"
 
-    is_http_mode = os.getenv('RESPONDER_HTTP_ONLY', "NO") == "YES"
+        is_http_mode = os.getenv('RESPONDER_HTTP_ONLY', "NO") == "YES"
 
-    if is_http_mode:
-    	self.prefix = "http://%sd/" % self.endpoint
-    else:
-	    self.prefix = "https://%sd/" % self.endpoint
+        if is_http_mode:
+            self.prefix = "http://%sd/" % self.endpoint
+        else:
+            self.prefix = "https://%sd/" % self.endpoint
 
     def record_hit(self, identity, comment=None) :
 
-	if comment == None:
-	    comment = ""
+        if comment == None:
+            comment = ""
 
-	url = self.prefix + comment + "?id=" + identity 
-	print url	
-	req = urllib2.Request(url)
-	try: 
-	    response = urllib2.urlopen(req)
-	    # do not care about the response.
-	except urllib2.URLError as e:
-	    print e.reason
+        url = self.prefix + comment + "?id=" + identity
+        print url
+        req = urllib2.Request(url)
+        try: 
+            response = urllib2.urlopen(req)
+            # do not care about the response.
+        except urllib2.URLError as e:
+            print e.reason
 
 # Initialize and start the DNS Server        
 def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53", logfile=None, loghttp=None, noproxy=False):
