@@ -399,19 +399,19 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
        
 class LogHttpService:
     def __init__(self, endpoint) :
-        print endpoint
-        
         if endpoint.endswith("/") :
-            self.endpoint = endpoint
+            self.endpoint = endpoint[:-1]
         else :
-            self.endpoint = endpoint + "/"
+            self.endpoint = endpoint
 
         is_http_mode = os.getenv('RESPONDER_HTTP_ONLY', "NO") == "YES"
 
         if is_http_mode:
-            self.prefix = "http://%sd/" % self.endpoint
+            self.prefix = "http://%s:443/d/" % self.endpoint
         else:
-            self.prefix = "https://%sd/" % self.endpoint
+            self.prefix = "https://%s/d/" % self.endpoint
+        
+        print "LogService prefix: %s" % self.prefix
 
     def record_hit(self, identity, comment=None) :
 
