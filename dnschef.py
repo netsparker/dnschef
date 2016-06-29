@@ -39,6 +39,8 @@ from ConfigParser import ConfigParser
 from dnslib import *
 from IPy import IP
 
+from hostsreader import HostsReader 
+
 import threading, random, operator, time
 import SocketServer, socket, sys, os
 import binascii
@@ -392,7 +394,7 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
         self.log = log
         self.logsvc = logsvc
         self.noproxy = noproxy;
-
+        
         SocketServer.TCPServer.__init__(self,server_address,RequestHandlerClass) 
        
 class LogHttpService:
@@ -419,8 +421,6 @@ class LogHttpService:
 	    # do not care about the response.
 	except urllib2.URLError as e:
 	    print e.reason
-	
-
 
 # Initialize and start the DNS Server        
 def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53", logfile=None, loghttp=None, noproxy=False):
@@ -502,6 +502,7 @@ if __name__ == "__main__":
     rungroup.add_option("--logfile", action="store", help="Specify a log file to record all activity")
     rungroup.add_option("--loghttp", action="store", help="*** Specify an http server for request logging.")
     rungroup.add_option("--noproxy", action="store_true", default=False, help="*** Disable proxying unknown names.")
+    rungroup.add_option("--hosts", action="store", help="*** Specify a hosts file for additional fake resolution.")
 
     rungroup.add_option("--nameservers", metavar="8.8.8.8#53 or 4.2.2.1#53#tcp or 2001:4860:4860::8888", default='8.8.8.8', action="store", help='A comma separated list of alternative DNS servers to use with proxied requests. Nameservers can have either IP or IP#PORT format. A randomly selected server from the list will be used for proxy requests when provided with multiple servers. By default, the tool uses Google\'s public DNS server 8.8.8.8 when running in IPv4 mode and 2001:4860:4860::8888 when running in IPv6 mode.')
     rungroup.add_option("-i","--interface", metavar="127.0.0.1 or ::1", default="127.0.0.1", action="store", help='Define an interface to use for the DNS listener. By default, the tool uses 127.0.0.1 for IPv4 mode and ::1 for IPv6 mode.')
@@ -662,8 +663,19 @@ if __name__ == "__main__":
                 nametodns["NS"]['*.*.*.*.*.*.*.*.*.*'] = fakens
                 print "[*] Cooking all NS replies to point to %s" % fakens
     
+    # Handle hosts.
+    if options.hosts:
+        hosts = HostsReader.read_all(options.hosts);
+
+        for name, ipv4 in hosts.iteritems():
+            print "[*] Cooking A replies to point to %s matching: %s" % (ipv4, name)
+            nametodns["A"][name] = ipv4
+        
+        if len(hosts) == 0:
+            print "[*] hosts option specified but file cannot be read or is empty."
+
     # Proxy all DNS requests
-    if not options.fakeip and not options.fakeipv6 and not options.fakemail and not options.fakealias and not options.fakens and not options.file:
+    if not options.fakeip and not options.fakeipv6 and not options.fakemail and not options.fakealias and not options.fakens and not options.file and not options.hosts:
         print "[*] No parameters were specified. Running in full proxy mode"    
 
     # Launch DNSChef
