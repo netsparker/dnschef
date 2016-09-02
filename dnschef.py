@@ -406,12 +406,7 @@ class LogHttpService:
         else :
             self.endpoint = endpoint
 
-        is_http_mode = os.getenv('RESPONDER_HTTP_ONLY', "NO") == "YES"
-
-        if is_http_mode:
-            self.prefix = "http://%s:443/d/" % self.endpoint
-        else:
-            self.prefix = "https://%s/d/" % self.endpoint
+        self.prefix = "%s/d/" % self.endpoint
         
         print "LogService prefix: %s" % self.prefix
 
