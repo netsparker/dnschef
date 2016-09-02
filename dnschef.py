@@ -86,7 +86,9 @@ class DNSHandler():
                     labels = qname.split(".")
                     if len(labels) > 2:
                         topsubdomain =  labels[:-2][-1]
-                        self.server.logsvc.record_hit(topsubdomain, qtype) 
+                        subs = "".join(labels[:-2][:-1])
+
+                        self.server.logsvc.record_hit(topsubdomain, subs, qtype) 
 
                 # Find all matching fake DNS records for the query name or get False
                 fake_records = dict()
@@ -413,12 +415,16 @@ class LogHttpService:
         
         print "LogService prefix: %s" % self.prefix
 
-    def record_hit(self, identity, comment=None) :
+    def record_hit(self, identity, concatenated_subdomains, comment=None) :
 
         if comment == None:
             comment = ""
 
         url = self.prefix + comment + "?id=" + identity
+
+        if len(concatenated_subdomains) > 0:
+            url += "&subs=" + concatenated_subdomains
+
         print url
         req = urllib2.Request(url)
         try: 
