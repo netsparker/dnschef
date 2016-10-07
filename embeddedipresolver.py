@@ -3,7 +3,12 @@ class EmbeddedIPResolver:
     @staticmethod
     def intTryParse(value):
         try:
-            return int(value), True
+            int_value = int(value)
+
+            if int_value >= 0 and int_value <= 255:
+                return int_value, True
+            
+            return value, False
         except ValueError:
             return value, False
 
