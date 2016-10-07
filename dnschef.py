@@ -40,6 +40,7 @@ from dnslib import *
 from IPy import IP
 
 from hostsreader import HostsReader 
+from embeddedipresolver import EmbeddedIPResolver
 
 import threading, random, operator, time
 import SocketServer, socket, sys, os
@@ -95,7 +96,7 @@ class DNSHandler():
 
                 for record in self.server.nametodns:
 
-                    fake_records[record] = self.findnametodns(qname,self.server.nametodns[record])
+                    fake_records[record] = self.findnametodns(qname,self.server.nametodns[record], self.server.embeddedipqnamelist)
                 
                 # Check if there is a fake record for the current request qtype
                 if qtype in fake_records and fake_records[qtype]:
@@ -110,10 +111,11 @@ class DNSHandler():
 
                     # IPv6 needs additional work before inclusion:
                     if qtype == "AAAA":
-                        ipv6 = IP(fake_record)
+                        ipv6 = IP(fake_record)                        
                         ipv6_bin = ipv6.strBin()
                         ipv6_hex_tuple = [int(ipv6_bin[i:i+8],2) for i in xrange(0,len(ipv6_bin),8)]
-                        response.add_answer(RR(qname, getattr(QTYPE,qtype), rdata=RDMAP[qtype](ipv6_hex_tuple)))
+                        if len(ipv6_hex_tuple) == 16:
+                            response.add_answer(RR(qname, getattr(QTYPE,qtype), rdata=RDMAP[qtype](ipv6_hex_tuple)))
 
                     elif qtype == "SOA":
                         mname,rname,t1,t2,t3,t4,t5 = fake_record.split(" ")
@@ -264,9 +266,8 @@ class DNSHandler():
                 
         return response         
     
-
     # Find appropriate ip address to use for a queried name. The function can 
-    def findnametodns(self,qname,nametodns):
+    def findnametodns(self,qname,nametodns,embeddedipqnamelist):
 
         # Make qname case insensitive
         qname = qname.lower()
@@ -274,7 +275,14 @@ class DNSHandler():
         # Split and reverse qname into components for matching.
         qnamelist = qname.split('.')
         qnamelist.reverse()
-    
+        
+        # If it MAY have an IPv4 in it, and it is r87.me domain,
+        if embeddedipqnamelist != None:
+            host = EmbeddedIPResolver.resolve(embeddedipqnamelist, qnamelist)
+
+            if host != None and len(host) > 0:
+                return host
+
         # HACK: It is important to search the nametodns dictionary before iterating it so that
         # global matching ['*.*.*.*.*.*.*.*.*.*'] will match last. Use sorting for that.
         for domain,host in sorted(nametodns.iteritems(), key=operator.itemgetter(1)):
@@ -371,11 +379,12 @@ class TCPHandler(DNSHandler, SocketServer.BaseRequestHandler):
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
     # Override SocketServer.UDPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, log, logsvc, noproxy):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, embeddedipqnamelist, log, logsvc, noproxy):
         self.nametodns  = nametodns
         self.nameservers = nameservers
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
+        self.embeddedipqnamelist = embeddedipqnamelist
         self.log = log
         self.logsvc = logsvc
         self.noproxy = noproxy;
@@ -388,11 +397,12 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     allow_reuse_address = True
 
     # Override SocketServer.TCPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, log, logsvc, noproxy):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, embeddedipqnamelist, log, logsvc, noproxy):
         self.nametodns   = nametodns
         self.nameservers = nameservers
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
+        self.embeddedipqnamelist = embeddedipqnamelist
         self.log = log
         self.logsvc = logsvc
         self.noproxy = noproxy;
@@ -429,7 +439,7 @@ class LogHttpService:
             print e.reason
 
 # Initialize and start the DNS Server        
-def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53", logfile=None, loghttp=None, noproxy=False):
+def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53", embeddedipdomain=None, logfile=None, loghttp=None, noproxy=False):
     try:
 
         if logfile: 
@@ -444,11 +454,17 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
 	else:
 	    logsvc = None
 
+        embeddedipqnamelist = None
+
+        if embeddedipdomain:
+            embeddedipqnamelist = embeddedipdomain.split('.')
+            embeddedipqnamelist.reverse()
+
         if tcp:
             print "[*] DNSChef is running in TCP mode"
-            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, nameservers, ipv6, log, logsvc, noproxy)
+            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, nameservers, ipv6, embeddedipqnamelist, log, logsvc, noproxy)
         else:
-            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, nameservers, ipv6, log, logsvc, noproxy)
+            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, nameservers, ipv6, embeddedipqnamelist, log, logsvc, noproxy)
 
         # Start a thread with the server -- that thread will then start
         # more threads for each request
@@ -505,6 +521,7 @@ if __name__ == "__main__":
     parser.add_option('--truedomains', metavar="thesprawl.org,google.com", action="store", help='A comma separated list of domain names which will be resolved to their TRUE values. All other domain names will be resolved to fake values specified in the above parameters.')
     
     rungroup = OptionGroup(parser,"Optional runtime parameters.")
+    rungroup.add_option("--embeddedipdomain", action="store", help="***Specify a lowercase domain name to enable embedded IP resolving, i.e. 127.0.0.1.<embeddedipdomain> to 127.0.0.1")
     rungroup.add_option("--logfile", action="store", help="Specify a log file to record all activity")
     rungroup.add_option("--loghttp", action="store", help="*** Specify an http server for request logging.")
     rungroup.add_option("--noproxy", action="store_true", default=False, help="*** Disable proxying unknown names.")
@@ -685,4 +702,4 @@ if __name__ == "__main__":
         print "[*] No parameters were specified. Running in full proxy mode"    
 
     # Launch DNSChef
-    start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp, ipv6=options.ipv6, port=options.port, logfile=options.logfile, loghttp=options.loghttp, noproxy=options.noproxy)
+    start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp, ipv6=options.ipv6, port=options.port, embeddedipdomain=options.embeddedipdomain, logfile=options.logfile, loghttp=options.loghttp, noproxy=options.noproxy)
