@@ -1,5 +1,4 @@
 class EmbeddedIPResolver:
-
     @staticmethod
     def intTryParse(value):
         try:
@@ -7,7 +6,7 @@ class EmbeddedIPResolver:
 
             if int_value >= 0 and int_value <= 255:
                 return int_value, True
-            
+
             return value, False
         except ValueError:
             return value, False
@@ -20,13 +19,13 @@ class EmbeddedIPResolver:
 
         if resolverqnamelist == None:
             return None
-        
-        if(len(qnamelist) < len(resolverqnamelist) + 4):
+
+        if (len(qnamelist) < len(resolverqnamelist) + 4):
             return None
 
         for i in xrange(0, len(resolverqnamelist)):
             if resolverqnamelist[i] != qnamelist[i]:
-                return None 
+                return None
 
         parsed = [EmbeddedIPResolver.intTryParse(label) for label in qnamelist[len(resolverqnamelist):]]
 
@@ -35,7 +34,7 @@ class EmbeddedIPResolver:
         for (value, success) in parsed:
             if success == False:
                 continue
-            
+
             parsedInts.insert(0, value)
 
         if len(parsedInts) < 4:
