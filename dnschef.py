@@ -46,10 +46,8 @@ from embeddedipresolver import EmbeddedIPResolver
 import threading, random, operator, time
 import SocketServer, socket, sys, os
 import binascii
-import string
 import base64
 import time
-import urllib
 import traceback
 
 

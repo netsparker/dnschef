@@ -18,7 +18,7 @@ class LogService:
         if comment is None:
             comment = ""
 
-        url = self.prefix + comment + "?id=" + identity
+        url = "%s%s+?id=%s" % (self.prefix, comment, identity)
 
         if len(concatenated_subdomains) > 0:
             url += "&subs=" + concatenated_subdomains
