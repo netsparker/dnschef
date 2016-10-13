@@ -4,7 +4,7 @@ class EmbeddedIPResolver:
         try:
             int_value = int(value)
 
-            if int_value >= 0 and int_value <= 255:
+            if 0 <= int_value <= 255:
                 return int_value, True
 
             return value, False
@@ -17,10 +17,10 @@ class EmbeddedIPResolver:
         # resolverqnamelist: com, example
         # qnamelist: com, example, <nonnumeric>, <numeric>, .. containing at least 4 numeric.
 
-        if resolverqnamelist == None:
+        if resolverqnamelist is None:
             return None
 
-        if (len(qnamelist) < len(resolverqnamelist) + 4):
+        if len(qnamelist) < len(resolverqnamelist) + 4:
             return None
 
         for i in xrange(0, len(resolverqnamelist)):
@@ -32,7 +32,7 @@ class EmbeddedIPResolver:
         parsedInts = []
 
         for (value, success) in parsed:
-            if success == False:
+            if not success:
                 continue
 
             parsedInts.insert(0, value)

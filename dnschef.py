@@ -39,6 +39,7 @@ from ConfigParser import ConfigParser
 from dnslib import *
 from IPy import IP
 
+from logservice import LogService
 from hostsreader import HostsReader
 from embeddedipresolver import EmbeddedIPResolver
 
@@ -49,7 +50,6 @@ import string
 import base64
 import time
 import urllib
-import urllib2
 import traceback
 
 
@@ -439,36 +439,6 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
         SocketServer.TCPServer.__init__(self, server_address, RequestHandlerClass)
 
 
-class LogHttpService:
-    def __init__(self, endpoint):
-        if endpoint.endswith("/"):
-            self.endpoint = endpoint[:-1]
-        else:
-            self.endpoint = endpoint
-
-        self.prefix = "%s/d/" % self.endpoint
-
-        print "LogService prefix: %s" % self.prefix
-
-    def record_hit(self, identity, concatenated_subdomains, comment=None):
-
-        if comment == None:
-            comment = ""
-
-        url = self.prefix + comment + "?id=" + identity
-
-        if len(concatenated_subdomains) > 0:
-            url += "&subs=" + concatenated_subdomains
-
-        print url
-        req = urllib2.Request(url)
-        try:
-            response = urllib2.urlopen(req)
-            # do not care about the response.
-        except urllib2.URLError as e:
-            print e.reason
-
-
 # Initialize and start the DNS Server
 def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53", embeddedipdomain=None,
                   logfile=None, loghttp=None, noproxy=False):
@@ -481,7 +451,7 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
             log = None
 
         if loghttp:
-            logsvc = LogHttpService(loghttp)
+            logsvc = LogService(loghttp)
             print "[*] loghttp is: " + loghttp
         else:
             logsvc = None
