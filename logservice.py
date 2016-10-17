@@ -16,9 +16,9 @@ class LogService:
     def record_hit(self, identity, concatenated_subdomains, comment=None):
 
         if comment is None:
-            comment = ""
-
-        url = "%s%s+?id=%s" % (self.prefix, comment, identity)
+            url = "%s?id=%s" % (self.prefix, identity)
+        else:
+            url = "%s%s?id=%s" % (self.prefix, comment, identity)
 
         if len(concatenated_subdomains) > 0:
             url += "&subs=" + concatenated_subdomains
