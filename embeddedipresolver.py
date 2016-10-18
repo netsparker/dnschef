@@ -29,11 +29,19 @@ class EmbeddedIPResolver:
 
         parsed = [EmbeddedIPResolver.intTryParse(label) for label in qnamelist[len(resolverqnamelist):]]
 
-        parsedInts = filter(lambda pair: pair[1], parsed)
+        parts = []
 
-        if len(parsedInts) < 4:
+        inserter = parts.insert
+
+        for (value, success) in parsed:
+            if not success:
+                continue
+
+            inserter(0, value)
+
+        if len(parts) < 4:
             return None
 
-        host = ".".join(str(x) for x in parsedInts[:4])
+        host = ".".join(str(x) for x in parts[:4])
 
         return host
