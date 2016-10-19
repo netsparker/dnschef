@@ -42,6 +42,6 @@ class EmbeddedIPResolver:
         if len(parts) < 4:
             return None
 
-        host = ".".join(str(x) for x in parts[:4])
+        host = ".".join(repr(x) for x in parts[:4])
 
         return host
