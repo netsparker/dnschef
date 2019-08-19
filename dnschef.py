@@ -82,14 +82,19 @@ class DNSHandler():
                 if self.server.logsvc != None:
                     # Find subdomain. Note that only the rightmost subdomain is important for logging purposes.
                     # Note that if subdomain length is less than a preset value in the app server, it will not be logged.
-                    labels = qname.split(".")
-                    if len(labels) > 2:
-                        topsubdomain = labels[:-2][-1]
-                        subs = "".join(labels[:-2][:-1])
+                    subdomain = qname.replace(self.server.domainname, "")
+
+                    # Chop off the last period
+                    if len(subdomain) > 0 and subdomain[-1] == '.': subdomain = subdomain[:-1]
+
+                    labels = subdomain.split(".")
+                    if len(labels) > 0:
+                        topsubdomain = labels[-1]
+                        subs = "".join(labels[:-1])
 
                         self.server.logsvc.record_hit(topsubdomain, subs, qtype)
 
-                        # Find all matching fake DNS records for the query name or get False
+                # Find all matching fake DNS records for the query name or get False
                 fake_records = dict()
 
                 for record in self.server.nametodns:
@@ -404,7 +409,7 @@ class TCPHandler(DNSHandler, SocketServer.BaseRequestHandler):
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
     # Override SocketServer.UDPServer to add extra parameters
     def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, embeddedipqnamelist, log,
-                 logsvc, noproxy):
+                 logsvc, noproxy, domainname):
         self.nametodns = nametodns
         self.nameservers = nameservers
         self.ipv6 = ipv6
@@ -412,7 +417,8 @@ class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         self.embeddedipqnamelist = embeddedipqnamelist
         self.log = log
         self.logsvc = logsvc
-        self.noproxy = noproxy;
+        self.noproxy = noproxy
+        self.domainname = domainname;
 
         SocketServer.UDPServer.__init__(self, server_address, RequestHandlerClass)
 
@@ -423,7 +429,7 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 
     # Override SocketServer.TCPServer to add extra parameters
     def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, embeddedipqnamelist, log,
-                 logsvc, noproxy):
+                 logsvc, noproxy, domainname):
         self.nametodns = nametodns
         self.nameservers = nameservers
         self.ipv6 = ipv6
@@ -431,7 +437,8 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
         self.embeddedipqnamelist = embeddedipqnamelist
         self.log = log
         self.logsvc = logsvc
-        self.noproxy = noproxy;
+        self.noproxy = noproxy
+        self.domainname = domainname;
 
         SocketServer.TCPServer.__init__(self, server_address, RequestHandlerClass)
 
@@ -462,10 +469,10 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
         if tcp:
             print "[*] DNSChef is running in TCP mode"
             server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, nameservers, ipv6,
-                                       embeddedipqnamelist, log, logsvc, noproxy)
+                                       embeddedipqnamelist, log, logsvc, noproxy, embeddedipdomain)
         else:
             server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, nameservers, ipv6,
-                                       embeddedipqnamelist, log, logsvc, noproxy)
+                                       embeddedipqnamelist, log, logsvc, noproxy, embeddedipdomain)
 
         # Start a thread with the server -- that thread will then start
         # more threads for each request
