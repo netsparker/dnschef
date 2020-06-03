@@ -23,7 +23,7 @@ class EmbeddedIPResolver:
         if len(qnamelist) < len(resolverqnamelist) + 4:
             return None
 
-        for i in xrange(0, len(resolverqnamelist)):
+        for i in range(0, len(resolverqnamelist)):
             if resolverqnamelist[i] != qnamelist[i]:
                 return None
 

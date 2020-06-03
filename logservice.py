@@ -11,7 +11,7 @@ class LogService:
 
         self.prefix = "%s/d/" % self.endpoint
 
-        print "LogService prefix: %s" % self.prefix
+        print("LogService prefix: %s" % self.prefix)
 
     def record_hit(self, identity, concatenated_subdomains, comment=None):
 
@@ -28,4 +28,4 @@ class LogService:
             requests.get(url)
         except Exception as e:
             # Log and ignore the exception.
-            print traceback.print_exc()
+            print(traceback.print_exc())

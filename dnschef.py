@@ -34,7 +34,7 @@ DNSCHEF_VERSION = "0.3"
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from optparse import OptionParser, OptionGroup
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 
 from dnslib import *
 from IPy import IP
@@ -44,7 +44,7 @@ from hostsreader import HostsReader
 from embeddedipresolver import EmbeddedIPResolver
 
 import threading, random, operator, time
-import SocketServer, socket, sys, os
+import socketserver, socket, sys, os
 import binascii
 import base64
 import traceback
@@ -60,8 +60,8 @@ class DNSHandler():
             # Parse data as DNS        
             d = DNSRecord.parse(data)
 
-        except Exception, e:
-            print "[%s] %s: ERROR: %s" % (time.strftime("%H:%M:%S"), self.client_address[0], "invalid DNS request")
+        except Exception as e:
+            print("[%s] %s: ERROR: %s" % (time.strftime("%H:%M:%S"), self.client_address[0], "invalid DNS request"))
             if self.server.log: self.server.log.write("[%s] %s: ERROR: %s\n" % (
                 time.strftime("%d/%b/%Y:%H:%M:%S %z"), self.client_address[0], "invalid DNS request"))
 
@@ -109,8 +109,8 @@ class DNSHandler():
                     # Create a custom response to the query
                     response = DNSRecord(DNSHeader(id=d.header.id, bitmap=d.header.bitmap, qr=1, aa=1, ra=1), q=d.q)
 
-                    print "[%s] %s: cooking the response of type '%s' for %s to %s" % (
-                        time.strftime("%H:%M:%S"), self.client_address[0], qtype, qname, fake_record)
+                    print("[%s] %s: cooking the response of type '%s' for %s to %s" % (
+                        time.strftime("%H:%M:%S"), self.client_address[0], qtype, qname, fake_record))
                     if self.server.log: self.server.log.write(
                         "[%s] %s: cooking the response of type '%s' for %s to %s\n" % (
                             time.strftime("%d/%b/%Y:%H:%M:%S %z"), self.client_address[0], qtype, qname, fake_record))
@@ -119,7 +119,7 @@ class DNSHandler():
                     if qtype == "AAAA":
                         ipv6 = IP(fake_record)
                         ipv6_bin = ipv6.strBin()
-                        ipv6_hex_tuple = [int(ipv6_bin[i:i + 8], 2) for i in xrange(0, len(ipv6_bin), 8)]
+                        ipv6_hex_tuple = [int(ipv6_bin[i:i + 8], 2) for i in range(0, len(ipv6_bin), 8)]
                         if len(ipv6_hex_tuple) == 16:
                             response.add_answer(RR(qname, getattr(QTYPE, qtype), rdata=RDMAP[qtype](ipv6_hex_tuple)))
 
@@ -189,9 +189,9 @@ class DNSHandler():
 
                     response = response.pack()
 
-                elif qtype == "*" and not None in fake_records.values():
-                    print "[%s] %s: cooking the response of type '%s' for %s with %s" % (
-                        time.strftime("%H:%M:%S"), self.client_address[0], "ANY", qname, "all known fake records.")
+                elif qtype == "*" and not None in list(fake_records.values()):
+                    print("[%s] %s: cooking the response of type '%s' for %s with %s" % (
+                        time.strftime("%H:%M:%S"), self.client_address[0], "ANY", qname, "all known fake records."))
                     if self.server.log: self.server.log.write(
                         "[%s] %s: cooking the response of type '%s' for %s with %s\n" % (
                             time.strftime("%d/%b/%Y:%H:%M:%S %z"), self.client_address[0], "ANY", qname,
@@ -199,7 +199,7 @@ class DNSHandler():
 
                     response = DNSRecord(DNSHeader(id=d.header.id, bitmap=d.header.bitmap, qr=1, aa=1, ra=1), q=d.q)
 
-                    for qtype, fake_record in fake_records.items():
+                    for qtype, fake_record in list(fake_records.items()):
                         if fake_record:
 
                             # NOTE: RDMAP is a dictionary map of qtype strings to handling classses
@@ -207,7 +207,7 @@ class DNSHandler():
                             if qtype == "AAAA":
                                 ipv6 = IP(fake_record)
                                 ipv6_bin = ipv6.strBin()
-                                fake_record = [int(ipv6_bin[i:i + 8], 2) for i in xrange(0, len(ipv6_bin), 8)]
+                                fake_record = [int(ipv6_bin[i:i + 8], 2) for i in range(0, len(ipv6_bin), 8)]
 
                             elif qtype == "SOA":
                                 mname, rname, t1, t2, t3, t4, t5 = fake_record.split(" ")
@@ -283,8 +283,8 @@ class DNSHandler():
 
                         return
 
-                    print "[%s] %s: proxying the response of type '%s' for %s" % (
-                        time.strftime("%H:%M:%S"), self.client_address[0], qtype, qname)
+                    print("[%s] %s: proxying the response of type '%s' for %s" % (
+                        time.strftime("%H:%M:%S"), self.client_address[0], qtype, qname))
                     if self.server.log: self.server.log.write("[%s] %s: proxying the response of type '%s' for %s\n" % (
                         time.strftime("%d/%b/%Y:%H:%M:%S %z"), self.client_address[0], qtype, qname))
 
@@ -313,7 +313,7 @@ class DNSHandler():
 
         # HACK: It is important to search the nametodns dictionary before iterating it so that
         # global matching ['*.*.*.*.*.*.*.*.*.*'] will match last. Use sorting for that.
-        for domain, host in sorted(nametodns.iteritems(), key=operator.itemgetter(1)):
+        for domain, host in sorted(iter(nametodns.items()), key=operator.itemgetter(1)):
 
             # NOTE: It is assumed that domain name was already lowercased
             #       when it was loaded through --file, --fakedomains or --truedomains
@@ -372,15 +372,15 @@ class DNSHandler():
 
                 sock.close()
 
-        except Exception, e:
-            print "[!] Could not proxy request: %s" % e
+        except Exception as e:
+            print("[!] Could not proxy request: %s" % e)
         else:
             return reply
 
             # UDP DNS Handler for incoming requests
 
 
-class UDPHandler(DNSHandler, SocketServer.BaseRequestHandler):
+class UDPHandler(DNSHandler, socketserver.BaseRequestHandler):
     def handle(self):
         (data, socket) = self.request
         response = self.parse(data)
@@ -390,7 +390,7 @@ class UDPHandler(DNSHandler, SocketServer.BaseRequestHandler):
 
 
 # TCP DNS Handler for incoming requests
-class TCPHandler(DNSHandler, SocketServer.BaseRequestHandler):
+class TCPHandler(DNSHandler, socketserver.BaseRequestHandler):
     def handle(self):
         data = self.request.recv(1024)
 
@@ -406,7 +406,7 @@ class TCPHandler(DNSHandler, SocketServer.BaseRequestHandler):
             self.request.sendall(length + response)
 
 
-class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
+class ThreadedUDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
     # Override SocketServer.UDPServer to add extra parameters
     def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, embeddedipqnamelist, log,
                  logsvc, noproxy, domainname):
@@ -420,10 +420,10 @@ class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         self.noproxy = noproxy
         self.domainname = domainname;
 
-        SocketServer.UDPServer.__init__(self, server_address, RequestHandlerClass)
+        socketserver.UDPServer.__init__(self, server_address, RequestHandlerClass)
 
 
-class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     # Override default value
     allow_reuse_address = True
 
@@ -440,7 +440,7 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
         self.noproxy = noproxy
         self.domainname = domainname;
 
-        SocketServer.TCPServer.__init__(self, server_address, RequestHandlerClass)
+        socketserver.TCPServer.__init__(self, server_address, RequestHandlerClass)
 
 
 # Initialize and start the DNS Server
@@ -456,7 +456,7 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
 
         if loghttp:
             logsvc = LogService(loghttp)
-            print "[*] loghttp is: " + loghttp
+            print("[*] loghttp is: " + loghttp)
         else:
             logsvc = None
 
@@ -467,7 +467,7 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
             embeddedipqnamelist.reverse()
 
         if tcp:
-            print "[*] DNSChef is running in TCP mode"
+            print("[*] DNSChef is running in TCP mode")
             server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, nameservers, ipv6,
                                        embeddedipqnamelist, log, logsvc, noproxy, embeddedipdomain)
         else:
@@ -493,15 +493,15 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
             log.close()
 
         server.shutdown()
-        print "[*] DNSChef is shutting down."
+        print("[*] DNSChef is shutting down.")
         sys.exit()
 
     except IOError:
-        print "[!] Failed to open log file for writing."
+        print("[!] Failed to open log file for writing.")
 
-    except Exception, e:
+    except Exception as e:
         traceback.print_exc()
-        print "[!] Failed to start the server: %s" % e
+        print("[!] Failed to start the server: %s" % e)
 
 
 if __name__ == "__main__":
@@ -563,42 +563,42 @@ if __name__ == "__main__":
 
     # Print program header
     if options.verbose:
-        print header
+        print(header)
 
     # Main storage of domain filters
     # NOTE: RDMAP is a dictionary map of qtype strings to handling classes
     nametodns = dict()
-    for qtype in RDMAP.keys():
+    for qtype in list(RDMAP.keys()):
         nametodns[qtype] = dict()
 
     # Incorrect or incomplete command line arguments
     if options.fakedomains and options.truedomains:
-        print "[!] You can not specify both 'fakedomains' and 'truedomains' parameters."
+        print("[!] You can not specify both 'fakedomains' and 'truedomains' parameters.")
         sys.exit(0)
 
     elif not (options.fakeip or options.fakeipv6) and (options.fakedomains or options.truedomains):
-        print "[!] You have forgotten to specify which IP to use for fake responses"
+        print("[!] You have forgotten to specify which IP to use for fake responses")
         sys.exit(0)
 
     # Notify user about alternative listening port
     if options.port != "53":
-        print "[*] Listening on an alternative port %s" % options.port
+        print("[*] Listening on an alternative port %s" % options.port)
 
     # Adjust defaults for IPv6
     if options.ipv6:
-        print "[*] Using IPv6 mode."
+        print("[*] Using IPv6 mode.")
         if options.interface == "127.0.0.1":
             options.interface = "::1"
 
         if options.nameservers == "8.8.8.8":
             options.nameservers = "2001:4860:4860::8888"
 
-    print "[*] DNSChef started on interface: %s " % options.interface
+    print("[*] DNSChef started on interface: %s " % options.interface)
 
     # Use alternative DNS servers
     if options.nameservers:
         nameservers = options.nameservers.split(',')
-        print "[*] Using the following nameservers: %s" % ", ".join(nameservers)
+        print("[*] Using the following nameservers: %s" % ", ".join(nameservers))
 
     # External file definitions
     if options.file:
@@ -612,9 +612,9 @@ if __name__ == "__main__":
                     domain = domain.lower()
 
                     nametodns[section][domain] = record
-                    print "[+] Cooking %s replies for domain %s with '%s'" % (section, domain, record)
+                    print("[+] Cooking %s replies for domain %s with '%s'" % (section, domain, record))
             else:
-                print "[!] DNS Record '%s' is not supported. Ignoring section contents." % section
+                print("[!] DNS Record '%s' is not supported. Ignoring section contents." % section)
 
     # DNS Record and Domain Name definitions
     # NOTE: '*.*.*.*.*.*.*.*.*.*' domain is used to match all possible queries.
@@ -634,23 +634,23 @@ if __name__ == "__main__":
 
                 if fakeip:
                     nametodns["A"][domain] = fakeip
-                    print "[*] Cooking A replies to point to %s matching: %s" % (options.fakeip, domain)
+                    print("[*] Cooking A replies to point to %s matching: %s" % (options.fakeip, domain))
 
                 if fakeipv6:
                     nametodns["AAAA"][domain] = fakeipv6
-                    print "[*] Cooking AAAA replies to point to %s matching: %s" % (options.fakeipv6, domain)
+                    print("[*] Cooking AAAA replies to point to %s matching: %s" % (options.fakeipv6, domain))
 
                 if fakemail:
                     nametodns["MX"][domain] = fakemail
-                    print "[*] Cooking MX replies to point to %s matching: %s" % (options.fakemail, domain)
+                    print("[*] Cooking MX replies to point to %s matching: %s" % (options.fakemail, domain))
 
                 if fakealias:
                     nametodns["CNAME"][domain] = fakealias
-                    print "[*] Cooking CNAME replies to point to %s matching: %s" % (options.fakealias, domain)
+                    print("[*] Cooking CNAME replies to point to %s matching: %s" % (options.fakealias, domain))
 
                 if fakens:
                     nametodns["NS"][domain] = fakens
-                    print "[*] Cooking NS replies to point to %s matching: %s" % (options.fakens, domain)
+                    print("[*] Cooking NS replies to point to %s matching: %s" % (options.fakens, domain))
 
         elif options.truedomains:
             for domain in options.truedomains.split(','):
@@ -661,27 +661,27 @@ if __name__ == "__main__":
 
                 if fakeip:
                     nametodns["A"][domain] = False
-                    print "[*] Cooking A replies to point to %s not matching: %s" % (options.fakeip, domain)
+                    print("[*] Cooking A replies to point to %s not matching: %s" % (options.fakeip, domain))
                     nametodns["A"]['*.*.*.*.*.*.*.*.*.*'] = fakeip
 
                 if fakeipv6:
                     nametodns["AAAA"][domain] = False
-                    print "[*] Cooking AAAA replies to point to %s not matching: %s" % (options.fakeipv6, domain)
+                    print("[*] Cooking AAAA replies to point to %s not matching: %s" % (options.fakeipv6, domain))
                     nametodns["AAAA"]['*.*.*.*.*.*.*.*.*.*'] = fakeipv6
 
                 if fakemail:
                     nametodns["MX"][domain] = False
-                    print "[*] Cooking MX replies to point to %s not matching: %s" % (options.fakemail, domain)
+                    print("[*] Cooking MX replies to point to %s not matching: %s" % (options.fakemail, domain))
                     nametodns["MX"]['*.*.*.*.*.*.*.*.*.*'] = fakemail
 
                 if fakealias:
                     nametodns["CNAME"][domain] = False
-                    print "[*] Cooking CNAME replies to point to %s not matching: %s" % (options.fakealias, domain)
+                    print("[*] Cooking CNAME replies to point to %s not matching: %s" % (options.fakealias, domain))
                     nametodns["CNAME"]['*.*.*.*.*.*.*.*.*.*'] = fakealias
 
                 if fakens:
                     nametodns["NS"][domain] = False
-                    print "[*] Cooking NS replies to point to %s not matching: %s" % (options.fakens, domain)
+                    print("[*] Cooking NS replies to point to %s not matching: %s" % (options.fakens, domain))
                     nametodns["NS"]['*.*.*.*.*.*.*.*.*.*'] = fakealias
 
         else:
@@ -691,38 +691,38 @@ if __name__ == "__main__":
 
             if fakeip:
                 nametodns["A"]['*.*.*.*.*.*.*.*.*.*'] = fakeip
-                print "[*] Cooking all A replies to point to %s" % fakeip
+                print("[*] Cooking all A replies to point to %s" % fakeip)
 
             if fakeipv6:
                 nametodns["AAAA"]['*.*.*.*.*.*.*.*.*.*'] = fakeipv6
-                print "[*] Cooking all AAAA replies to point to %s" % fakeipv6
+                print("[*] Cooking all AAAA replies to point to %s" % fakeipv6)
 
             if fakemail:
                 nametodns["MX"]['*.*.*.*.*.*.*.*.*.*'] = fakemail
-                print "[*] Cooking all MX replies to point to %s" % fakemail
+                print("[*] Cooking all MX replies to point to %s" % fakemail)
 
             if fakealias:
                 nametodns["CNAME"]['*.*.*.*.*.*.*.*.*.*'] = fakealias
-                print "[*] Cooking all CNAME replies to point to %s" % fakealias
+                print("[*] Cooking all CNAME replies to point to %s" % fakealias)
 
             if fakens:
                 nametodns["NS"]['*.*.*.*.*.*.*.*.*.*'] = fakens
-                print "[*] Cooking all NS replies to point to %s" % fakens
+                print("[*] Cooking all NS replies to point to %s" % fakens)
 
     # Handle hosts.
     if options.hosts:
         hosts = HostsReader.read_all(options.hosts);
 
-        for name, ipv4 in hosts.iteritems():
-            print "[*] Cooking A replies to point to %s matching: %s" % (ipv4, name)
+        for name, ipv4 in hosts.items():
+            print("[*] Cooking A replies to point to %s matching: %s" % (ipv4, name))
             nametodns["A"][name] = ipv4
 
         if len(hosts) == 0:
-            print "[*] hosts option specified but file cannot be read or is empty."
+            print("[*] hosts option specified but file cannot be read or is empty.")
 
     # Proxy all DNS requests
     if not options.fakeip and not options.fakeipv6 and not options.fakemail and not options.fakealias and not options.fakens and not options.file and not options.hosts:
-        print "[*] No parameters were specified. Running in full proxy mode"
+        print("[*] No parameters were specified. Running in full proxy mode")
 
         # Launch DNSChef
     start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp,

@@ -28,7 +28,7 @@ class HostsReader:
 
                     # looks like ipv4?
                     if parts[0].count('.') != 3:
-                        print "Unrecognized hosts line :" + line
+                        print("Unrecognized hosts line :" + line)
                         continue
 
                     result[parts[1]] = parts[0]
