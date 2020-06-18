@@ -449,7 +449,7 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
     try:
 
         if logfile:
-            log = open(logfile, 'a', 0)
+            log = open(logfile, 'a')
             log.write("[%s] DNSChef is active.\n" % (time.strftime("%d/%b/%Y:%H:%M:%S %z")))
         else:
             log = None
