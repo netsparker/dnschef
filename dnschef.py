@@ -324,7 +324,7 @@ class DNSHandler():
             domain.reverse()
 
             # Compare domains in reverse.
-            for a, b in map(None, qnamelist, domain):
+            for a, b in zip(qnamelist, domain):
                 if a != b and b != "*":
                     break
             else:
