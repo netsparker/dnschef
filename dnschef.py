@@ -48,6 +48,7 @@ import socketserver, socket, sys, os
 import binascii
 import base64
 import traceback
+import itertools
 
 
 # DNSHandler Mixin. The class contains generic functions to parse DNS requests and
@@ -324,7 +325,7 @@ class DNSHandler():
             domain.reverse()
 
             # Compare domains in reverse.
-            for a, b in zip(qnamelist, domain):
+            for a, b in itertools.zip_longest(qnamelist, domain, fillvalue=None): 
                 if a != b and b != "*":
                     break
             else:
