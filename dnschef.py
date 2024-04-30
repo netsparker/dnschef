@@ -82,7 +82,8 @@ class DNSHandler():
                 if self.server.logsvc != None:
                     # Find subdomain. Note that only the rightmost subdomain is important for logging purposes.
                     # Note that if subdomain length is less than a preset value in the app server, it will not be logged.
-                    subdomain = qname.replace(self.server.domainname, "")
+                    qname = qname.lower()
+                    subdomain = qname.replace(self.server.domainname.lower(), "")
 
                     # Chop off the last period
                     if len(subdomain) > 0 and subdomain[-1] == '.': subdomain = subdomain[:-1]
